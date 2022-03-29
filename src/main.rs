@@ -1,3 +1,4 @@
 fn main() {
-    pollster::block_on(smoothie::run());
+    let renderer = smoothie::Renderer::new();
+    pollster::block_on(renderer.run());
 }
