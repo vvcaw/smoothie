@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello, smoothie!");
+    pollster::block_on(smoothie::run());
 }
