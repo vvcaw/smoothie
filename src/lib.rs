@@ -1,3 +1,3 @@
-mod renderer;
+mod app;
 
-pub use renderer::Renderer;
+pub use app::App;
