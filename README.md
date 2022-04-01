@@ -2,9 +2,9 @@
 
 ![smoothie](https://user-images.githubusercontent.com/57096338/159522158-c1bee1c2-e250-4550-b081-422fa9d7c462.png)
 
-A **smooth** *high-level* animation engine developed in [Rust](https://www.rust-lang.org/).
+A **smooth** *high-level* rendering library developed in [Rust](https://www.rust-lang.org/).
 
-**smoothie** is supposed to provide a simple to use animation engine, aimed to enable users to easily animate data.
+**smoothie** is supposed to provide a simple to use rendering API, aimed to enable users to easily animate data.
 
 ## A Quick Note
 It is currently in early development stages and therefore not at all functional. 
