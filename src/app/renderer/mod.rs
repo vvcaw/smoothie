@@ -1,4 +1,5 @@
 mod state;
+mod vertex;
 
 pub use state::State;
 
