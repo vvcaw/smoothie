@@ -1,33 +1,20 @@
+use std::thread;
+use std::time::Duration;
+
 fn main() {
-    UserRenderer::new().run();
-}
+    let mut smoothie = smoothie::shake();
 
-struct CustomRenderState {
-    count: i32,
-}
-
-struct UserRenderer {
-    state: CustomRenderState,
-}
-
-impl UserRenderer {
-    pub fn new() -> Self {
-        Self {
-            state: CustomRenderState { count: 0 },
-        }
+    {
+        let dom = smoothie.dom();
+        dom.insert(String::from("Hello"), String::from("World!"));
     }
 
-    // Pass self by value here
-    pub fn run(self) {
-        let mut app = smoothie::App::new(
-            self.state,
-            Box::new(|state: &mut CustomRenderState, dom: &mut Vec<String>| {
-                //println!("Count: {:?}", state.count);
-                //println!("DOM: {:#?}", dom);
-                state.count += 1;
-            }),
-        );
+    thread::sleep(Duration::new(2, 0));
 
-        pollster::block_on(app.run());
-    }
+    smoothie.commit();
+
+    thread::sleep(Duration::new(5, 0));
+
+    let dom = smoothie.dom();
+    println!("{:?}", dom);
 }

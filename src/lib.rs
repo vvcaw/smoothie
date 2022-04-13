@@ -1,3 +1,10 @@
-mod app;
+mod renderer;
+mod smoothie;
 
-pub use app::App;
+pub use smoothie::Smoothie;
+pub use smoothie::DOM;
+
+/// Creates a new **Smoothie** instance for live rendering
+pub fn shake() -> Smoothie {
+    Smoothie::new()
+}
