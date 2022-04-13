@@ -4,13 +4,13 @@
 
 A **smooth** *high-level* rendering library developed in [Rust](https://www.rust-lang.org/).
 
-**smoothie** is supposed to provide a simple to use rendering API, aimed to enable users to easily animate data.
+**Smoothie** is supposed to provide a simple-to-use rendering API, aimed to enable users to easily animate data.
 
 ## A Quick Note
-It is currently in early development stages and therefore not at all functional. 
+**Smoothie** is currently in early development stages and therefore not at all functional. 
 
 # Contribution
-As this project is in early stages of development, be aware that many things may drastically change!
+As this project is in early stages of development, be aware that many things may drastically change! If you still want to help with development:
 
 1. `Fork` this repository
 2. Create a `branch`
