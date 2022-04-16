@@ -1,7 +1,5 @@
-use crate::renderer::Renderer;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread;
+use std::sync::{Arc, Mutex};
 
 /// Custom type to represent the rendering **DOM**
 pub type DOM = HashMap<String, String>;
@@ -16,16 +14,7 @@ pub struct Smoothie {
 
 impl Smoothie {
     /// Create new **Smoothie** instance
-    pub fn new() -> Self {
-        let dom = Arc::new(Mutex::new(HashMap::new()));
-
-        // Create renderer to run asynchronously
-        let renderer_dom = Arc::clone(&dom);
-        thread::spawn(move || {
-            let renderer = Renderer::new(renderer_dom);
-            renderer.render();
-        });
-
+    pub fn new(dom: Arc<Mutex<DOM>>) -> Self {
         Self {
             dom,
             dom_copy: HashMap::new(),
@@ -39,13 +28,12 @@ impl Smoothie {
 
     /// Commits the changes to the **dom** to the **renderer**
     pub fn commit(&self) {
-        println!("Commited");
         match self.dom.lock() {
             Ok(mut dom) => {
                 *dom = self.dom_copy.clone();
             }
-            Err(_) => {
-                println!("Locked?");
+            Err(e) => {
+                eprintln!("{:?}", e);
             }
         }
     }
