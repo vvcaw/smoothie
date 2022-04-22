@@ -140,7 +140,7 @@ impl RenderState {
                 color: [1.0, 0.0, 0.0, 1.0],
                 z_index: 0,
                 width: 0.0,
-                translate: [0.0, 0.0],
+                translate: [0.0; 3],
                 angle: 0.0,
                 ..Primitive::DEFAULT
             })
@@ -151,6 +151,8 @@ impl RenderState {
             color: [0.5, 1.0, 0.0, 1.0],
             z_index: 0,
             width: 1.0,
+            scale: 0.4,
+            translate: [0.0, 0.0, 0.0],
             ..Primitive::DEFAULT
         };
 

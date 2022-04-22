@@ -2,13 +2,12 @@
 
 struct Primitive {
     color: vec4<f32>;
-    translate: vec2<f32>;
     z_index: i32;
     width: f32;
     angle: f32;
     scale: f32;
+    translate: vec3<f32>;
     pad1: i32;
-    pad2: i32;
 };
 
 // Primitive struct recieved from CPU in [[stage(vertex)]]
@@ -36,8 +35,11 @@ fn vs_main(
 
     var out: VertexOutput;
 
+    var local_pos = (a_position * prim.scale);
+    var world_pos = local_pos - prim.translate;
+
     out.color = prim.color;
-    out.clip_position = vec4<f32>(a_position, 1.0);
+    out.clip_position = vec4<f32>(world_pos, 1.0);
     return out;
 }
 
