@@ -12,7 +12,7 @@ use lyon::tessellation::{
 };
 use std::sync::MutexGuard;
 use wgpu::util::DeviceExt;
-use wgpu::{Backends, Buffer};
+use wgpu::{Backends, BindGroup, Buffer};
 use winit::event::WindowEvent;
 use winit::window::Window;
 
@@ -40,6 +40,37 @@ impl StrokeVertexConstructor<Vertex> for WithId {
     }
 }
 
+const PRIM_BUFFER_LEN: usize = 256;
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct Primitive {
+    color: [f32; 4],
+    translate: [f32; 2],
+    z_index: i32,
+    width: f32,
+    angle: f32,
+    scale: f32,
+    _pad1: i32,
+    _pad2: i32,
+}
+
+impl Primitive {
+    const DEFAULT: Self = Primitive {
+        color: [0.0; 4],
+        translate: [0.0; 2],
+        z_index: 0,
+        width: 0.0,
+        angle: 0.0,
+        scale: 1.0,
+        _pad1: 0,
+        _pad2: 0,
+    };
+}
+
+unsafe impl bytemuck::Pod for Primitive {}
+unsafe impl bytemuck::Zeroable for Primitive {}
+
 /// The **Renderer** struct
 pub struct RenderState {
     surface: wgpu::Surface,
@@ -51,6 +82,9 @@ pub struct RenderState {
     index_buffer: Buffer,
     vertex_buffer: Buffer,
     num_indices: u32,
+    primitives: Vec<Primitive>,
+    prims_ubo: Buffer,
+    bind_group: BindGroup,
     pub(crate) size: winit::dpi::PhysicalSize<u32>,
 }
 
@@ -150,10 +184,70 @@ impl RenderState {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into()),
         });
 
+        // Number of samples for anti-aliasing
+        let sample_count = 4;
+
+        // Create vector for binding primitives to GPU
+        let mut primitives = Vec::with_capacity(PRIM_BUFFER_LEN);
+        for _ in 0..PRIM_BUFFER_LEN {
+            primitives.push(Primitive {
+                color: [1.0, 0.0, 0.0, 1.0],
+                z_index: 0,
+                width: 0.0,
+                translate: [0.0, 0.0],
+                angle: 0.0,
+                ..Primitive::DEFAULT
+            })
+        }
+
+        // Fill arrow primitive data
+        primitives[arrow_prim_id] = Primitive {
+            color: [0.5, 1.0, 0.0, 1.0],
+            z_index: 0,
+            width: 1.0,
+            ..Primitive::DEFAULT
+        };
+
+        // Determine size of primitive buffer
+        let prim_buffer_byte_size = (PRIM_BUFFER_LEN * std::mem::size_of::<Primitive>()) as u64;
+
+        // Create primitive buffer
+        let prims_ubo = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Prims ubo"),
+            size: prim_buffer_byte_size,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Create bind group layout for uniform buffers
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Bind group layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(prim_buffer_byte_size),
+                },
+                count: None,
+            }],
+        });
+
+        // Create bind group
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Bind group"),
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(prims_ubo.as_entire_buffer_binding()),
+            }],
+        });
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -197,9 +291,6 @@ impl RenderState {
             multiview: None,
         });
 
-        // Number of samples for anti-aliasing
-        let sample_count = 4;
-
         Self {
             surface,
             device,
@@ -210,6 +301,9 @@ impl RenderState {
             vertex_buffer: vbo,
             index_buffer: ibo,
             num_indices,
+            primitives,
+            prims_ubo,
+            bind_group,
             size,
         }
     }
@@ -252,6 +346,10 @@ impl RenderState {
                     label: Some("Render Encoder"),
                 });
 
+        // Manipulate data in primitives...
+        self.queue
+            .write_buffer(&self.prims_ubo, 0, bytemuck::cast_slice(&self.primitives));
+
         // command_encoder is borrowed here, but dropped after scope ends to access it later
         {
             let mut render_pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -273,6 +371,7 @@ impl RenderState {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
