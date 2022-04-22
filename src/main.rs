@@ -26,7 +26,7 @@ fn update(smoothie: &mut Smoothie) {
 
         // thread::sleep(Duration::new(1, 0));
 
-        println!("{:?}", dom);
+        //println!("{:?}", dom);
 
         smoothie.commit();
     }

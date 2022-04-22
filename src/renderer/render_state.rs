@@ -1,36 +1,44 @@
-use crate::renderer::vertex::Vertex;
+extern crate lyon;
 
+use crate::renderer::vertex::Vertex;
 use crate::smoothie::DOM;
+use std::collections::btree_map::Range;
+
+use lyon::math::point;
+use lyon::path::{FillRule, Path};
+use lyon::tessellation::{
+    BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor,
+    StrokeTessellator, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
+};
 use std::sync::MutexGuard;
 use wgpu::util::DeviceExt;
-use wgpu::Backends;
+use wgpu::{Backends, Buffer};
 use winit::event::WindowEvent;
 use winit::window::Window;
 
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-0.0868241, 0.49240386, 0.0],
-        color: [1.0, 0.0, 0.0],
-    }, // A
-    Vertex {
-        position: [-0.49513406, 0.06958647, 0.0],
-        color: [0.0, 1.0, 0.0],
-    }, // B
-    Vertex {
-        position: [-0.21918549, -0.44939706, 0.0],
-        color: [0.0, 0.0, 1.0],
-    }, // C
-    Vertex {
-        position: [0.35966998, -0.3473291, 0.0],
-        color: [1.0, 0.0, 1.0],
-    }, // D
-    Vertex {
-        position: [0.44147372, 0.2347359, 0.0],
-        color: [1.0, 1.0, 0.0],
-    }, // E
-];
+/// This vertex constructor forwards the positions and normals provided by the
+/// tessellators and add a shape id.
+pub struct WithId(pub u32);
 
-const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
+impl FillVertexConstructor<Vertex> for WithId {
+    fn new_vertex(&mut self, vertex: FillVertex) -> Vertex {
+        Vertex {
+            position: [vertex.position().x, vertex.position().y, 0.0],
+            color: [0.0, 1.0, 0.0],
+            prim_id: self.0,
+        }
+    }
+}
+
+impl StrokeVertexConstructor<Vertex> for WithId {
+    fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex {
+        Vertex {
+            position: [vertex.position().x, vertex.position().y, 0.0],
+            color: [0.0, 1.0, 0.0],
+            prim_id: self.0,
+        }
+    }
+}
 
 /// The **Renderer** struct
 pub struct RenderState {
@@ -39,9 +47,9 @@ pub struct RenderState {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    num_vertices: u32,
-    index_buffer: wgpu::Buffer,
+    sample_count: i32,
+    index_buffer: Buffer,
+    vertex_buffer: Buffer,
     num_indices: u32,
     pub(crate) size: winit::dpi::PhysicalSize<u32>,
 }
@@ -50,6 +58,39 @@ impl RenderState {
     // Creating some of the wgpu types requires async code
     /// Initializes all relevant data for **Renderer**
     pub async fn new(window: &Window) -> Self {
+        // Build a Path for the arrow.
+        let mut builder = Path::builder();
+        builder.begin(point(-1.0, -0.3));
+        builder.line_to(point(0.0, -0.3));
+        builder.line_to(point(0.0, -1.0));
+        builder.line_to(point(1.0, 0.0));
+        builder.line_to(point(0.0, 1.0));
+        builder.line_to(point(0.0, 0.3));
+        builder.line_to(point(-1.0, 0.3));
+        builder.close();
+        let arrow_path = builder.build();
+
+        let tolerance = 0.02;
+        let arrow_prim_id = 0;
+
+        let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+
+        let mut fill_tess = FillTessellator::new();
+
+        fill_tess
+            .tessellate_path(
+                &arrow_path,
+                &FillOptions::tolerance(tolerance).with_fill_rule(FillRule::NonZero),
+                &mut BuffersBuilder::new(&mut geometry, WithId(arrow_prim_id as u32)),
+            )
+            .unwrap();
+
+        let num_indices = geometry.indices.len() as u32;
+
+        geometry.vertices.iter().for_each(|vertex| {
+            println!("{:?}", vertex);
+        });
+
         let size = window.inner_size();
 
         // The instance to handle the GPU
@@ -81,6 +122,18 @@ impl RenderState {
             )
             .await
             .expect("Failed to get device or create queue");
+
+        let vbo = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&geometry.vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let ibo = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&geometry.indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -124,7 +177,8 @@ impl RenderState {
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
+                // Render primitives clock wise
+                front_face: wgpu::FrontFace::Cw,
                 cull_mode: Some(wgpu::Face::Back),
                 // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
                 polygon_mode: wgpu::PolygonMode::Fill,
@@ -143,21 +197,8 @@ impl RenderState {
             multiview: None,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let num_vertices = VERTICES.len() as u32;
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let num_indices = INDICES.len() as u32;
+        // Number of samples for anti-aliasing
+        let sample_count = 4;
 
         Self {
             surface,
@@ -165,9 +206,9 @@ impl RenderState {
             queue,
             config,
             render_pipeline,
-            vertex_buffer,
-            num_vertices,
-            index_buffer,
+            sample_count,
+            vertex_buffer: vbo,
+            index_buffer: ibo,
             num_indices,
             size,
         }
@@ -195,7 +236,7 @@ impl RenderState {
     pub fn render(&mut self, dom: MutexGuard<DOM>) -> Result<(), wgpu::SurfaceError> {
         // Receive DOM as MutexGuard<DOM> to unlock after rendering
         dom.iter().for_each(|(k, v)| {
-            println!("{}, {}", k, v);
+            //println!("{}, {}", k, v);
         });
 
         // Wait for surface to provide a new SurfaceTexture
