@@ -1,75 +1,21 @@
 extern crate lyon;
 
+use crate::renderer::primitive::Primitive;
 use crate::renderer::vertex::Vertex;
+use crate::renderer::with_id::WithId;
 use crate::smoothie::DOM;
-use std::collections::btree_map::Range;
 
 use lyon::math::point;
 use lyon::path::{FillRule, Path};
-use lyon::tessellation::{
-    BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor,
-    StrokeTessellator, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
-};
+use lyon::tessellation::{BuffersBuilder, FillOptions, FillTessellator, VertexBuffers};
 use std::sync::MutexGuard;
 use wgpu::util::DeviceExt;
 use wgpu::{Backends, BindGroup, Buffer};
+use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::window::Window;
 
-/// This vertex constructor forwards the positions and normals provided by the
-/// tessellators and add a shape id.
-pub struct WithId(pub u32);
-
-impl FillVertexConstructor<Vertex> for WithId {
-    fn new_vertex(&mut self, vertex: FillVertex) -> Vertex {
-        Vertex {
-            position: [vertex.position().x, vertex.position().y, 0.0],
-            color: [0.0, 1.0, 0.0],
-            prim_id: self.0,
-        }
-    }
-}
-
-impl StrokeVertexConstructor<Vertex> for WithId {
-    fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex {
-        Vertex {
-            position: [vertex.position().x, vertex.position().y, 0.0],
-            color: [0.0, 1.0, 0.0],
-            prim_id: self.0,
-        }
-    }
-}
-
 const PRIM_BUFFER_LEN: usize = 256;
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct Primitive {
-    color: [f32; 4],
-    translate: [f32; 2],
-    z_index: i32,
-    width: f32,
-    angle: f32,
-    scale: f32,
-    _pad1: i32,
-    _pad2: i32,
-}
-
-impl Primitive {
-    const DEFAULT: Self = Primitive {
-        color: [0.0; 4],
-        translate: [0.0; 2],
-        z_index: 0,
-        width: 0.0,
-        angle: 0.0,
-        scale: 1.0,
-        _pad1: 0,
-        _pad2: 0,
-    };
-}
-
-unsafe impl bytemuck::Pod for Primitive {}
-unsafe impl bytemuck::Zeroable for Primitive {}
 
 /// The **Renderer** struct
 pub struct RenderState {
@@ -78,21 +24,20 @@ pub struct RenderState {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     render_pipeline: wgpu::RenderPipeline,
-    sample_count: i32,
     index_buffer: Buffer,
     vertex_buffer: Buffer,
     num_indices: u32,
     primitives: Vec<Primitive>,
     prims_ubo: Buffer,
     bind_group: BindGroup,
-    pub(crate) size: winit::dpi::PhysicalSize<u32>,
+    size: winit::dpi::PhysicalSize<u32>,
 }
 
 impl RenderState {
     // Creating some of the wgpu types requires async code
     /// Initializes all relevant data for **Renderer**
     pub async fn new(window: &Window) -> Self {
-        // Build a Path for the arrow.
+        // Build a Path for the arrow. TODO: This should be done by some `impl Element` struct
         let mut builder = Path::builder();
         builder.begin(point(-1.0, -0.3));
         builder.line_to(point(0.0, -0.3));
@@ -107,6 +52,7 @@ impl RenderState {
         let tolerance = 0.02;
         let arrow_prim_id = 0;
 
+        // Create the vertex buffer
         let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
         let mut fill_tess = FillTessellator::new();
@@ -157,13 +103,13 @@ impl RenderState {
             .await
             .expect("Failed to get device or create queue");
 
-        let vbo = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&geometry.vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let ibo = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&geometry.indices),
             usage: wgpu::BufferUsages::INDEX,
@@ -297,9 +243,8 @@ impl RenderState {
             queue,
             config,
             render_pipeline,
-            sample_count,
-            vertex_buffer: vbo,
-            index_buffer: ibo,
+            vertex_buffer,
+            index_buffer,
             num_indices,
             primitives,
             prims_ubo,
@@ -383,5 +328,10 @@ impl RenderState {
         output.present();
 
         Ok(())
+    }
+
+    /// Returns the current window size
+    pub fn size(&self) -> PhysicalSize<u32> {
+        self.size
     }
 }

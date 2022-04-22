@@ -28,12 +28,14 @@ struct VertexOutput {
 [[stage(vertex)]]
 fn vs_main(
     [[location(0)]] a_position: vec3<f32>,
-    [[location(1)]] a_color: vec3<f32>,
+    [[location(1)]] a_normal: vec3<f32>,
     [[location(2)]] a_prim_id: u32
 ) -> VertexOutput {
+    // Get current primitive data from uniform buffer
     var prim: Primitive = u_primitives.primitives[a_prim_id];
 
     var out: VertexOutput;
+
     out.color = prim.color;
     out.clip_position = vec4<f32>(a_position, 1.0);
     return out;

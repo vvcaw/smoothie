@@ -1,11 +1,12 @@
+mod primitive;
 mod render_state;
 mod vertex;
-
-use render_state::RenderState;
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+mod with_id;
 
 use crate::DOM;
+use render_state::RenderState;
+
+use std::sync::{Arc, Mutex};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::run_return::EventLoopExtRunReturn;
@@ -69,7 +70,9 @@ impl Renderer {
                         match render_state.render(dom) {
                             Ok(_) => {}
                             // Reconfigure the surface if lost
-                            Err(wgpu::SurfaceError::Lost) => render_state.resize(render_state.size),
+                            Err(wgpu::SurfaceError::Lost) => {
+                                render_state.resize(render_state.size())
+                            }
                             // The system is out of memory, we should probably quit
                             Err(wgpu::SurfaceError::OutOfMemory) => {
                                 *control_flow = ControlFlow::Exit
