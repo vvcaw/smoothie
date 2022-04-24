@@ -1,5 +1,5 @@
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 // Because the struct implements the `bytemuck::Pod` trait, it may not contain any padding bytes
 /// A **primitive** that is passed to enable uniform rendering for all **Elements**.
 pub struct Primitive {
