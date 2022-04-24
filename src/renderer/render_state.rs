@@ -4,10 +4,13 @@ use crate::renderer::primitive::Primitive;
 use crate::renderer::vertex::Vertex;
 use crate::renderer::with_id::WithId;
 use crate::smoothie::DOM;
+use std::ops::Range;
 
 use lyon::math::point;
 use lyon::path::{FillRule, Path};
-use lyon::tessellation::{BuffersBuilder, FillOptions, FillTessellator, VertexBuffers};
+use lyon::tessellation::{
+    BuffersBuilder, FillOptions, FillTessellator, StrokeOptions, StrokeTessellator, VertexBuffers,
+};
 use std::sync::MutexGuard;
 use wgpu::util::DeviceExt;
 use wgpu::{Backends, BindGroup, Buffer};
@@ -26,7 +29,8 @@ pub struct RenderState {
     render_pipeline: wgpu::RenderPipeline,
     index_buffer: Buffer,
     vertex_buffer: Buffer,
-    num_indices: u32,
+    fill_index_range: Range<u32>,
+    stroke_index_range: Range<u32>,
     primitives: Vec<Primitive>,
     prims_ubo: Buffer,
     bind_group: BindGroup,
@@ -51,11 +55,13 @@ impl RenderState {
 
         let tolerance = 0.02;
         let arrow_prim_id = 0;
+        let stroke_prim_id = 1;
 
         // Create the vertex buffer
         let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
         let mut fill_tess = FillTessellator::new();
+        let mut stroke_tess = StrokeTessellator::new();
 
         fill_tess
             .tessellate_path(
@@ -65,11 +71,24 @@ impl RenderState {
             )
             .unwrap();
 
-        let num_indices = geometry.indices.len() as u32;
+        let fill_index_range = 0..(geometry.indices.len() as u32);
+
+        stroke_tess
+            .tessellate_path(
+                &arrow_path,
+                &StrokeOptions::tolerance(tolerance).with_line_width(0.1),
+                &mut BuffersBuilder::new(&mut geometry, WithId(stroke_prim_id as u32)),
+            )
+            .unwrap();
+
+        let stroke_index_range = fill_index_range.end..(geometry.indices.len() as u32);
 
         geometry.vertices.iter().for_each(|vertex| {
             println!("{:?}", vertex);
         });
+
+        println!("{:?}", fill_index_range);
+        println!("{:?}", stroke_index_range);
 
         let size = window.inner_size();
 
@@ -148,13 +167,27 @@ impl RenderState {
 
         // Fill arrow primitive data
         primitives[arrow_prim_id] = Primitive {
-            color: [0.5, 1.0, 0.0, 1.0],
+            color: [0.0, 1.0, 0.0, 1.0],
             z_index: 0,
             width: 1.0,
             scale: 0.4,
             translate: [0.0, 0.0, 0.0],
             ..Primitive::DEFAULT
         };
+
+        primitives[stroke_prim_id] = Primitive {
+            color: [0.0, 0.0, 0.0, 1.0],
+            z_index: 0,
+            width: 1.0,
+            scale: 0.4,
+            translate: [0.5, 0.0, 0.0],
+            ..Primitive::DEFAULT
+        };
+
+        println!("{:?}", primitives[0]);
+        println!("{:?}", primitives[1]);
+        println!("{:?}", primitives[2]);
+        println!("{:?}", std::mem::size_of::<Primitive>());
 
         // Determine size of primitive buffer
         let prim_buffer_byte_size = (PRIM_BUFFER_LEN * std::mem::size_of::<Primitive>()) as u64;
@@ -247,7 +280,8 @@ impl RenderState {
             render_pipeline,
             vertex_buffer,
             index_buffer,
-            num_indices,
+            fill_index_range,
+            stroke_index_range,
             primitives,
             prims_ubo,
             bind_group,
@@ -294,8 +328,8 @@ impl RenderState {
                 });
 
         // Manipulate data in primitives...
-        self.queue
-            .write_buffer(&self.prims_ubo, 0, bytemuck::cast_slice(&self.primitives));
+        let a = bytemuck::cast_slice(&self.primitives);
+        self.queue.write_buffer(&self.prims_ubo, 0, a);
 
         // command_encoder is borrowed here, but dropped after scope ends to access it later
         {
@@ -321,7 +355,8 @@ impl RenderState {
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            render_pass.draw_indexed(self.fill_index_range.clone(), 0, 0..1);
+            render_pass.draw_indexed(self.stroke_index_range.clone(), 0, 0..1);
             //render_pass.draw(0..self.num_vertices, 0..1);
         }
 
