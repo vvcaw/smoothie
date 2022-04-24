@@ -27,7 +27,7 @@ impl Vertex {
                 },
                 wgpu::VertexAttribute {
                     // prim_id
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress, // ! Offset is measured from the beginning of input [f32; 6]
                     shader_location: 2,
                     format: wgpu::VertexFormat::Uint32,
                 },
