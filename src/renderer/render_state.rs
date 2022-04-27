@@ -6,6 +6,7 @@ use crate::renderer::with_id::WithId;
 use crate::smoothie::DOM;
 use std::ops::Range;
 
+use lyon::lyon_tessellation::LineCap;
 use lyon::math::point;
 use lyon::path::{FillRule, Path};
 use lyon::tessellation::{
@@ -76,7 +77,9 @@ impl RenderState {
         stroke_tess
             .tessellate_path(
                 &arrow_path,
-                &StrokeOptions::tolerance(tolerance).with_line_width(0.1),
+                &StrokeOptions::tolerance(tolerance)
+                    .with_line_width(0.05)
+                    .with_line_cap(LineCap::Round),
                 &mut BuffersBuilder::new(&mut geometry, WithId(stroke_prim_id as u32)),
             )
             .unwrap();
@@ -180,7 +183,7 @@ impl RenderState {
             z_index: 0,
             width: 1.0,
             scale: 0.4,
-            translate: [0.5, 0.0, 0.0],
+            translate: [0.0, 0.0, 0.0],
             ..Primitive::DEFAULT
         };
 
