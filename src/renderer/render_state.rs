@@ -35,6 +35,7 @@ pub struct RenderState {
     primitives: Vec<Primitive>,
     prims_ubo: Buffer,
     bind_group: BindGroup,
+    sample_count: u32,
     size: winit::dpi::PhysicalSize<u32>,
 }
 
@@ -173,7 +174,7 @@ impl RenderState {
             color: [0.0, 1.0, 0.0, 1.0],
             z_index: 0,
             width: 1.0,
-            scale: 0.4,
+            scale: 0.8,
             translate: [0.0, 0.0, 0.0],
             ..Primitive::DEFAULT
         };
@@ -182,7 +183,7 @@ impl RenderState {
             color: [0.0, 0.0, 0.0, 1.0],
             z_index: 0,
             width: 1.0,
-            scale: 0.4,
+            scale: 0.8,
             translate: [0.0, 0.0, 0.0],
             ..Primitive::DEFAULT
         };
@@ -267,7 +268,7 @@ impl RenderState {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState {
-                count: 1,
+                count: sample_count,
                 mask: !0,
                 // Anti-Aliasing
                 alpha_to_coverage_enabled: false,
@@ -288,6 +289,7 @@ impl RenderState {
             primitives,
             prims_ubo,
             bind_group,
+            sample_count,
             size,
         }
     }
@@ -317,12 +319,43 @@ impl RenderState {
             //println!("{}, {}", k, v);
         });
 
-        // Wait for surface to provide a new SurfaceTexture
-        let output = self.surface.get_current_texture()?;
+        let frame = match self.surface.get_current_texture() {
+            Ok(texture) => texture,
+            Err(e) => {
+                println!("Swap-chain error: {:?}", e);
+                panic!("Swap-chain error!"); // TODO: Proper error handling
+            }
+        };
 
-        let view = output
+        // Frame view to later render
+        let frame_view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+            label: Some("Multisampled frame descriptor"),
+            size: wgpu::Extent3d {
+                width: self.size.width,
+                height: self.size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: self.sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.config.format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        };
+
+        // Create multisampled view to later pass to frame view
+        let multisampled_render_target = if self.sample_count > 1 {
+            Some(
+                self.device
+                    .create_texture(multisampled_frame_descriptor)
+                    .create_view(&wgpu::TextureViewDescriptor::default()),
+            )
+        } else {
+            None
+        };
 
         let mut command_encoder =
             self.device
@@ -336,21 +369,31 @@ impl RenderState {
 
         // command_encoder is borrowed here, but dropped after scope ends to access it later
         {
-            let mut render_pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
+            // A resolve target is only supported if the attachment actually uses anti-aliasing
+            // So if sample_count == 1 then we must render directly to the surface's buffer
+            let color_attachment = if let Some(msaa_target) = &multisampled_render_target {
+                wgpu::RenderPassColorAttachment {
+                    view: &msaa_target,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                         store: true,
                     },
-                }],
+                    resolve_target: Some(&frame_view),
+                }
+            } else {
+                wgpu::RenderPassColorAttachment {
+                    view: &frame_view,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        store: true,
+                    },
+                    resolve_target: None,
+                }
+            };
+
+            let mut render_pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[color_attachment],
                 depth_stencil_attachment: None,
             });
 
@@ -365,7 +408,7 @@ impl RenderState {
 
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(command_encoder.finish()));
-        output.present();
+        frame.present();
 
         Ok(())
     }
