@@ -7,6 +7,7 @@ use crate::DOM;
 use render_state::RenderState;
 
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::run_return::EventLoopExtRunReturn;
@@ -16,12 +17,20 @@ use winit::window::WindowBuilder;
 pub struct Renderer {
     /// The rendering **DOM**
     dom: Arc<Mutex<DOM>>,
+    /// Frame count since last FPS report
+    frame_count: i32,
+    /// Time to next report
+    next_report: Instant,
 }
 
 impl Renderer {
     /// Creates a new **Renderer** instance to take care of rendering to the screen
     pub fn new(dom: Arc<Mutex<DOM>>) -> Self {
-        Self { dom }
+        Self {
+            dom,
+            frame_count: 0,
+            next_report: Instant::now() + Duration::from_secs(1),
+        }
     }
 
     /// Runs the current **application** built
@@ -79,6 +88,14 @@ impl Renderer {
                             }
                             // All other errors (Outdated, Timeout) should be resolved by the next frame
                             Err(e) => eprintln!("{:?}", e),
+                        }
+
+                        self.frame_count += 1;
+                        let now = Instant::now();
+                        if now >= self.next_report {
+                            println!("{} FPS", &self.frame_count);
+                            self.frame_count = 0;
+                            self.next_report = now + Duration::from_secs(1);
                         }
                     }
                     Err(e) => {

@@ -305,9 +305,19 @@ impl RenderState {
         }
     }
 
-    // TODO: Think about removing event handling entirely
+    // TODO: Think about exposing this as a function to the user too, and use the normal function as an **physics** or **update** loop and use this for input only, or expose events and time to smoothie
     /// Processes the given **event**
     pub fn input(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::CursorMoved { position, .. } => {
+                self.primitives[0].scale = (position.x as f32 / self.size.width as f32);
+                self.primitives[1].scale = (position.y as f32 / self.size.height as f32);
+
+                return true;
+            }
+            _ => return false,
+        }
+
         // If this returns true, the event loop is not executed further!
         false
     }
