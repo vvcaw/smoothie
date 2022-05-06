@@ -143,6 +143,7 @@ impl RenderState {
             format: surface.get_preferred_format(&adapter).unwrap(),
             width: size.width,
             height: size.height,
+            // ! Fifo caps the framerate to the max display frame rate
             present_mode: wgpu::PresentMode::Fifo,
         };
 
