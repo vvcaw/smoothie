@@ -6,7 +6,7 @@ use crate::renderer::with_id::WithId;
 use crate::smoothie::DOM;
 use std::ops::Range;
 
-use lyon::lyon_tessellation::LineCap;
+use lyon::lyon_tessellation::{LineCap, LineJoin};
 use lyon::math::point;
 use lyon::path::{FillRule, Path};
 use lyon::tessellation::{
@@ -45,13 +45,13 @@ impl RenderState {
     pub async fn new(window: &Window) -> Self {
         // Build a Path for the arrow. TODO: This should be done by some `impl Element` struct
         let mut builder = Path::builder();
-        builder.begin(point(-1.0, -0.3));
-        builder.line_to(point(0.0, -0.3));
-        builder.line_to(point(0.0, -1.0));
+        builder.begin(point(-1.0, -0.2));
+        builder.line_to(point(0.0, -0.2));
+        builder.line_to(point(0.0, -0.8));
         builder.line_to(point(1.0, 0.0));
-        builder.line_to(point(0.0, 1.0));
-        builder.line_to(point(0.0, 0.3));
-        builder.line_to(point(-1.0, 0.3));
+        builder.line_to(point(0.0, 0.8));
+        builder.line_to(point(0.0, 0.2));
+        builder.line_to(point(-1.0, 0.2));
         builder.close();
         let arrow_path = builder.build();
 
@@ -73,7 +73,7 @@ impl RenderState {
             )
             .unwrap();
 
-        let fill_index_range = 0..(geometry.indices.len() as u32);
+        let mut fill_index_range = 0..(geometry.indices.len() as u32);
 
         stroke_tess
             .tessellate_path(
@@ -86,6 +86,7 @@ impl RenderState {
             .unwrap();
 
         let stroke_index_range = fill_index_range.end..(geometry.indices.len() as u32);
+        fill_index_range = 0..(geometry.indices.len() as u32);
 
         geometry.vertices.iter().for_each(|vertex| {
             println!("{:?}", vertex);
@@ -316,6 +317,7 @@ impl RenderState {
 
                 return true;
             }
+            // Not any specific event we're catching, forward it to the main loop
             _ => return false,
         }
 
@@ -413,7 +415,7 @@ impl RenderState {
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(self.fill_index_range.clone(), 0, 0..1);
-            render_pass.draw_indexed(self.stroke_index_range.clone(), 0, 0..1);
+            //render_pass.draw_indexed(self.stroke_index_range.clone(), 0, 0..1);
             //render_pass.draw(0..self.num_vertices, 0..1);
         }
 
