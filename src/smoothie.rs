@@ -1,8 +1,9 @@
+use crate::element::Element;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Custom type to represent the rendering **DOM**
-pub type DOM = HashMap<String, String>;
+pub type DOM = HashMap<usize, Box<dyn Element + Send>>;
 
 /// The **Smoothie** struct
 pub struct Smoothie {

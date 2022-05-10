@@ -5,13 +5,15 @@ mod with_id;
 
 use crate::DOM;
 use render_state::RenderState;
-
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::window::WindowBuilder;
+
+pub use vertex::Vertex;
+pub use with_id::WithId;
 
 /// The **Renderer** struct
 pub struct Renderer {

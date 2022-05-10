@@ -1,3 +1,4 @@
+mod element;
 mod renderer;
 mod smoothie;
 
@@ -6,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+pub use element::Arrow;
 pub use smoothie::Smoothie;
 pub use smoothie::DOM;
 

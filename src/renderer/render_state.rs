@@ -2,17 +2,11 @@ extern crate lyon;
 
 use crate::renderer::primitive::Primitive;
 use crate::renderer::vertex::Vertex;
-use crate::renderer::with_id::WithId;
 use crate::smoothie::DOM;
 use std::ops::Range;
 
-use lyon::lyon_tessellation::{LineCap, LineJoin};
-use lyon::math::point;
-use lyon::path::{FillRule, Path};
-use lyon::tessellation::{
-    BuffersBuilder, FillOptions, FillTessellator, StrokeOptions, StrokeTessellator, VertexBuffers,
-};
 use std::sync::MutexGuard;
+use lyon::tessellation::VertexBuffers;
 use wgpu::util::DeviceExt;
 use wgpu::{Backends, BindGroup, Buffer};
 use winit::dpi::PhysicalSize;
@@ -28,10 +22,6 @@ pub struct RenderState {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     render_pipeline: wgpu::RenderPipeline,
-    index_buffer: Buffer,
-    vertex_buffer: Buffer,
-    fill_index_range: Range<u32>,
-    stroke_index_range: Range<u32>,
     primitives: Vec<Primitive>,
     prims_ubo: Buffer,
     bind_group: BindGroup,
@@ -43,58 +33,6 @@ impl RenderState {
     // Creating some of the wgpu types requires async code
     /// Initializes all relevant data for **Renderer**
     pub async fn new(window: &Window) -> Self {
-        // Build a Path for the arrow. TODO: This should be done by some `impl Element` struct
-        let mut builder = Path::builder();
-        builder.begin(point(-1.0, -0.2));
-        builder.line_to(point(0.0, -0.2));
-        builder.line_to(point(0.0, -0.8));
-        builder.line_to(point(1.0, 0.0));
-        builder.line_to(point(0.0, 0.8));
-        builder.line_to(point(0.0, 0.2));
-        builder.line_to(point(-1.0, 0.2));
-        builder.close();
-        let arrow_path = builder.build();
-
-        let tolerance = 0.02;
-        let arrow_prim_id = 0;
-        let stroke_prim_id = 1;
-
-        // Create the vertex buffer
-        let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
-
-        let mut fill_tess = FillTessellator::new();
-        let mut stroke_tess = StrokeTessellator::new();
-
-        fill_tess
-            .tessellate_path(
-                &arrow_path,
-                &FillOptions::tolerance(tolerance).with_fill_rule(FillRule::NonZero),
-                &mut BuffersBuilder::new(&mut geometry, WithId(arrow_prim_id as u32)),
-            )
-            .unwrap();
-
-        let mut fill_index_range = 0..(geometry.indices.len() as u32);
-
-        stroke_tess
-            .tessellate_path(
-                &arrow_path,
-                &StrokeOptions::tolerance(tolerance)
-                    .with_line_width(0.05)
-                    .with_line_cap(LineCap::Round),
-                &mut BuffersBuilder::new(&mut geometry, WithId(stroke_prim_id as u32)),
-            )
-            .unwrap();
-
-        let stroke_index_range = fill_index_range.end..(geometry.indices.len() as u32);
-        fill_index_range = 0..(geometry.indices.len() as u32);
-
-        geometry.vertices.iter().for_each(|vertex| {
-            println!("{:?}", vertex);
-        });
-
-        println!("{:?}", fill_index_range);
-        println!("{:?}", stroke_index_range);
-
         let size = window.inner_size();
 
         // The instance to handle the GPU
@@ -127,18 +65,6 @@ impl RenderState {
             .await
             .expect("Failed to get device or create queue");
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&geometry.vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&geometry.indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface.get_preferred_format(&adapter).unwrap(),
@@ -170,30 +96,6 @@ impl RenderState {
                 ..Primitive::DEFAULT
             })
         }
-
-        // Fill arrow primitive data
-        primitives[arrow_prim_id] = Primitive {
-            color: [0.0, 1.0, 0.0, 1.0],
-            z_index: 0,
-            width: 1.0,
-            scale: 0.8,
-            translate: [0.0, 0.0, 0.0],
-            ..Primitive::DEFAULT
-        };
-
-        primitives[stroke_prim_id] = Primitive {
-            color: [0.0, 0.0, 0.0, 1.0],
-            z_index: 0,
-            width: 1.0,
-            scale: 0.8,
-            translate: [0.0, 0.0, 0.0],
-            ..Primitive::DEFAULT
-        };
-
-        println!("{:?}", primitives[0]);
-        println!("{:?}", primitives[1]);
-        println!("{:?}", primitives[2]);
-        println!("{:?}", std::mem::size_of::<Primitive>());
 
         // Determine size of primitive buffer
         let prim_buffer_byte_size = (PRIM_BUFFER_LEN * std::mem::size_of::<Primitive>()) as u64;
@@ -284,10 +186,6 @@ impl RenderState {
             queue,
             config,
             render_pipeline,
-            vertex_buffer,
-            index_buffer,
-            fill_index_range,
-            stroke_index_range,
             primitives,
             prims_ubo,
             bind_group,
@@ -327,9 +225,36 @@ impl RenderState {
 
     /// Renders the current frame
     pub fn render(&mut self, dom: MutexGuard<DOM>) -> Result<(), wgpu::SurfaceError> {
+        // Create the buffer for tesselation
+        let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+
         // Receive DOM as MutexGuard<DOM> to unlock after rendering
-        dom.iter().for_each(|(k, v)| {
-            //println!("{}, {}", k, v);
+        dom.iter().for_each(|(element_id, element)| {
+            // Render the element and fill the geometry buffer
+            element.render(&mut geometry, *element_id);
+
+            // Update the primitives according to element data
+            self.primitives[*element_id] = Primitive {
+                color: [0.0, 1.0, 0.0, 1.0],
+                z_index: 0,
+                width: 1.0,
+                scale: element.scale(),
+                translate: [0.0, 0.0, 0.0],
+                ..Primitive::DEFAULT
+            };
+        });
+
+        // TODO: Is it necessary to create buffers here?
+        let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&geometry.vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let index_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&geometry.indices),
+            usage: wgpu::BufferUsages::INDEX,
         });
 
         let frame = match self.surface.get_current_texture() {
@@ -376,9 +301,7 @@ impl RenderState {
                     label: Some("Render Encoder"),
                 });
 
-        // Manipulate data in primitives...
-        let a = bytemuck::cast_slice(&self.primitives);
-        self.queue.write_buffer(&self.prims_ubo, 0, a);
+        self.queue.write_buffer(&self.prims_ubo, 0, bytemuck::cast_slice(&self.primitives));
 
         // command_encoder is borrowed here, but dropped after scope ends to access it later
         {
@@ -412,11 +335,9 @@ impl RenderState {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(self.fill_index_range.clone(), 0, 0..1);
-            //render_pass.draw_indexed(self.stroke_index_range.clone(), 0, 0..1);
-            //render_pass.draw(0..self.num_vertices, 0..1);
+            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed((0..geometry.indices.len() as u32), 0, 0..1);
         }
 
         // submit will accept anything that implements IntoIter

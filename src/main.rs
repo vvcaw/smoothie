@@ -1,33 +1,15 @@
 use smoothie::Smoothie;
-use std::thread;
-use std::time::Duration;
 
 fn main() {
     smoothie::shake(update);
 }
 
 fn update(smoothie: &mut Smoothie) {
-    /*{
-            let dom = smoothie.dom();
-            dom.insert(String::from("Hello"), String::from("World!"));
-        }
+    let dom = smoothie.dom();
 
-        thread::sleep(Duration::new(2, 0));
+    dom.insert(0, Box::new(smoothie::Arrow::new(0.8)));
 
-        smoothie.commit();
+    smoothie.commit();
 
-        thread::sleep(Duration::new(5, 0));
-    */
-
-    for i in 0..100000 {
-        let dom = smoothie.dom();
-
-        dom.insert(String::from("Hello"), String::from("World!"));
-
-        // thread::sleep(Duration::new(1, 0));
-
-        //println!("{:?}", dom);
-
-        smoothie.commit();
-    }
+    for i in 0..10000 {}
 }
