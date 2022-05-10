@@ -22,7 +22,7 @@ pub trait Element {
     fn box_clone(&self) -> Box<dyn Element + Send>;
 }
 
-// Implement the clone trait for Box<dyn Element>
+// Implement the clone trait for Box<dyn Element + Send>
 impl Clone for Box<dyn Element + Send> {
     fn clone(&self) -> Self {
         self.box_clone()
