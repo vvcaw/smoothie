@@ -2,8 +2,8 @@
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 /// A **vertex** representation
 pub struct Vertex {
-    pub(crate) position: [f32; 3],
-    pub(crate) normal: [f32; 3],
+    pub(crate) position: [f32; 2],
+    pub(crate) normal: [f32; 2],
     pub(crate) prim_id: u32,
 }
 
@@ -17,17 +17,17 @@ impl Vertex {
                     // position
                     offset: 0,
                     shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
                     // normal
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
                     // prim_id
-                    offset: std::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress, // ! Offset is measured from the beginning of input [f32; 6]
+                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress, // ! Offset is measured from the beginning of input [f32; 6]
                     shader_location: 2,
                     format: wgpu::VertexFormat::Uint32,
                 },

@@ -2,12 +2,13 @@
 
 struct Primitive {
     color: vec4<f32>;
+    translate: vec2<f32>;
     z_index: i32;
-    width: f32;
     angle: f32;
     scale: f32;
-    translate: vec3<f32>;
     pad1: i32;
+    pad2: i32;
+    pad3: i32;
 };
 
 // Primitive struct recieved from CPU in [[stage(vertex)]]
@@ -26,8 +27,8 @@ struct VertexOutput {
 
 [[stage(vertex)]]
 fn vs_main(
-    [[location(0)]] a_position: vec3<f32>,
-    [[location(1)]] a_normal: vec3<f32>,
+    [[location(0)]] a_position: vec2<f32>,
+    [[location(1)]] a_normal: vec2<f32>,
     [[location(2)]] a_prim_id: u32
 ) -> VertexOutput {
     // Get current primitive data from uniform buffer
@@ -39,7 +40,7 @@ fn vs_main(
     var world_pos = local_pos - prim.translate;
 
     out.color = prim.color;
-    out.clip_position = vec4<f32>(world_pos, 1.0);
+    out.clip_position = vec4<f32>(world_pos, f32(prim.z_index), 1.0);
     return out;
 }
 

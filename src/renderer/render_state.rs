@@ -89,9 +89,8 @@ impl RenderState {
         for _ in 0..PRIM_BUFFER_LEN {
             primitives.push(Primitive {
                 color: [1.0, 0.0, 0.0, 1.0],
+                translate: [0.0; 2],
                 z_index: 0,
-                width: 0.0,
-                translate: [0.0; 3],
                 angle: 0.0,
                 ..Primitive::DEFAULT
             })
@@ -236,10 +235,9 @@ impl RenderState {
             // Update the primitives according to element data
             self.primitives[*element_id] = Primitive {
                 color: [0.0, 1.0, 0.0, 1.0],
+                translate: [0.0, 0.0],
                 z_index: 0,
-                width: 1.0,
                 scale: element.get_scale(),
-                translate: [0.0, 0.0, 0.0],
                 ..Primitive::DEFAULT
             };
         });
