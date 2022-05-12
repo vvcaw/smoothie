@@ -16,7 +16,10 @@ pub trait Element {
     fn render(&self, geometry: &mut VertexBuffers<Vertex, u16>, primitive_id: usize);
 
     /// Returns the scale of the given **Element**
-    fn scale(&self) -> f32;
+    fn get_scale(&self) -> f32;
+
+    /// Sets the scale of the given **Element**
+    fn set_scale(&mut self, scale: f32);
 
     /// Clones inside a **Box**
     fn box_clone(&self) -> Box<dyn Element + Send>;

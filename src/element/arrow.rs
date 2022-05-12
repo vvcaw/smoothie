@@ -73,8 +73,12 @@ impl Element for Arrow {
         }
     }
 
-    fn scale(&self) -> f32 {
+    fn get_scale(&self) -> f32 {
         self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
     }
 
     fn box_clone(&self) -> Box<dyn Element + Send> {

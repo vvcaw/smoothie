@@ -5,8 +5,8 @@ use crate::renderer::vertex::Vertex;
 use crate::smoothie::DOM;
 use std::ops::Range;
 
-use std::sync::MutexGuard;
 use lyon::tessellation::VertexBuffers;
+use std::sync::MutexGuard;
 use wgpu::util::DeviceExt;
 use wgpu::{Backends, BindGroup, Buffer};
 use winit::dpi::PhysicalSize;
@@ -238,24 +238,28 @@ impl RenderState {
                 color: [0.0, 1.0, 0.0, 1.0],
                 z_index: 0,
                 width: 1.0,
-                scale: element.scale(),
+                scale: element.get_scale(),
                 translate: [0.0, 0.0, 0.0],
                 ..Primitive::DEFAULT
             };
         });
 
-        // TODO: Is it necessary to create buffers here?
-        let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&geometry.vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        // TODO: Is it necessary to create buffers here every frame?
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&geometry.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let index_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&geometry.indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        let index_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&geometry.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
         let frame = match self.surface.get_current_texture() {
             Ok(texture) => texture,
@@ -301,7 +305,8 @@ impl RenderState {
                     label: Some("Render Encoder"),
                 });
 
-        self.queue.write_buffer(&self.prims_ubo, 0, bytemuck::cast_slice(&self.primitives));
+        self.queue
+            .write_buffer(&self.prims_ubo, 0, bytemuck::cast_slice(&self.primitives));
 
         // command_encoder is borrowed here, but dropped after scope ends to access it later
         {
