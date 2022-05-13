@@ -36,8 +36,13 @@ fn vs_main(
 
     var out: VertexOutput;
 
-    var local_pos = (a_position * prim.scale);
-    var world_pos = local_pos - prim.translate;
+    var rotation = mat2x2<f32>(
+       vec2<f32>(cos(prim.angle), -sin(prim.angle)),
+       vec2<f32>(sin(prim.angle), cos(prim.angle))
+    );
+
+    var local_pos = (a_position * prim.scale) * rotation;
+    var world_pos = local_pos + prim.translate;
 
     out.color = prim.color;
     out.clip_position = vec4<f32>(world_pos, f32(prim.z_index), 1.0);

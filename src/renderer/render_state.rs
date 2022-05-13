@@ -238,6 +238,7 @@ impl RenderState {
                 translate: [0.0, 0.0],
                 z_index: 0,
                 scale: element.get_scale(),
+                angle: element.get_angle(),
                 ..Primitive::DEFAULT
             };
         });

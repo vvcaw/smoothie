@@ -15,6 +15,7 @@ pub struct Arrow {
     stroke: bool,
     fill: bool,
     scale: f32,
+    angle: f32,
 }
 
 impl Arrow {
@@ -25,6 +26,7 @@ impl Arrow {
             stroke: true,
             fill: false, // TODO: Since both stroke and fill vertices use the same buffer, the colors of the fill / stroke vertices are the same, to avoid this, maybe add a fill and a stroke color to the Primitive and the vertex shader stage, as this will be needed for any shape that is rendered
             scale,
+            angle: 0.0,
         }
     }
 }
@@ -79,6 +81,14 @@ impl Element for Arrow {
 
     fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
+    }
+
+    fn get_angle(&self) -> f32 {
+        self.angle
+    }
+
+    fn set_angle(&mut self, angle: f32) {
+        self.angle = angle;
     }
 
     fn box_clone(&self) -> Box<dyn Element + Send> {

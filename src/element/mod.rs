@@ -21,6 +21,12 @@ pub trait Element {
     /// Sets the scale of the given **Element**
     fn set_scale(&mut self, scale: f32);
 
+    /// Returns the angle of the given **Element**
+    fn get_angle(&self) -> f32;
+
+    /// Sets the angle of the given **Element**
+    fn set_angle(&mut self, angle: f32);
+
     /// Clones inside a **Box**
     fn box_clone(&self) -> Box<dyn Element + Send>;
 }
