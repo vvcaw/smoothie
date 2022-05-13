@@ -1,5 +1,12 @@
 // Vertex shader
 
+struct Globals {
+    resolution: vec2<f32>;
+    offset: vec2<f32>;
+    zoom: f32;
+    _pad: i32;
+};
+
 struct Primitive {
     color: vec4<f32>;
     translate: vec2<f32>;
@@ -20,6 +27,9 @@ struct Primitives {
 // Bind group with index 0 and binding with index 0
 [[group(0), binding(0)]] var<uniform> u_primitives: Primitives;
 
+// Bind group with index 0 and binding with index 1
+[[group(0), binding(1)]] var<uniform> u_globals: Globals;
+
 struct VertexOutput {
     [[builtin(position)]] clip_position: vec4<f32>;
     [[location(0)]] color: vec4<f32>;
@@ -34,6 +44,8 @@ fn vs_main(
     // Get current primitive data from uniform buffer
     var prim: Primitive = u_primitives.primitives[a_prim_id];
 
+    var res = u_globals.resolution;
+
     var out: VertexOutput;
 
     var rotation = mat2x2<f32>(
@@ -42,10 +54,12 @@ fn vs_main(
     );
 
     var local_pos = (a_position * prim.scale) * rotation;
-    var world_pos = local_pos + prim.translate;
+    var world_pos = local_pos - u_globals.offset + prim.translate;
+
+    var transformed_pos = world_pos * u_globals.zoom / (res / length(res));
 
     out.color = prim.color;
-    out.clip_position = vec4<f32>(world_pos, f32(prim.z_index), 1.0);
+    out.clip_position = vec4<f32>(transformed_pos, f32(prim.z_index), 1.0);
     return out;
 }
 

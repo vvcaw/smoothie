@@ -21,7 +21,10 @@ fn update(smoothie: &mut Smoothie) {
     loop {
         let dom = smoothie.dom();
 
-        dom.get_mut(&0).unwrap().set_scale((duration % 2f32) / 2f32);
+        dom.get_mut(&0).unwrap().set_scale((duration / 3f32) % 1f32);
+        dom.get_mut(&0)
+            .unwrap()
+            .set_angle((duration * 0.5f32) % 2.0 * PI);
 
         smoothie.commit();
         duration = smoothie.time_since_start().as_secs_f32();

@@ -23,8 +23,8 @@ impl Arrow {
         Arrow {
             x: 0.0,
             y: 0.0,
-            stroke: true,
-            fill: false, // TODO: Since both stroke and fill vertices use the same buffer, the colors of the fill / stroke vertices are the same, to avoid this, maybe add a fill and a stroke color to the Primitive and the vertex shader stage, as this will be needed for any shape that is rendered
+            stroke: false,
+            fill: true, // TODO: Since both stroke and fill vertices use the same buffer, the colors of the fill / stroke vertices are the same, to avoid this, maybe add a fill and a stroke color to the Primitive and the vertex shader stage, as this will be needed for any shape that is rendered
             scale,
             angle: 0.0,
         }

@@ -5,6 +5,7 @@ use crate::renderer::vertex::Vertex;
 use crate::smoothie::DOM;
 use std::ops::Range;
 
+use crate::renderer::globals::Globals;
 use lyon::tessellation::VertexBuffers;
 use std::sync::MutexGuard;
 use wgpu::util::DeviceExt;
@@ -24,9 +25,12 @@ pub struct RenderState {
     render_pipeline: wgpu::RenderPipeline,
     primitives: Vec<Primitive>,
     prims_ubo: Buffer,
+    globals_ubo: Buffer,
     bind_group: BindGroup,
     sample_count: u32,
     size: winit::dpi::PhysicalSize<u32>,
+    zoom: f32,
+    offset: [f32; 2],
 }
 
 impl RenderState {
@@ -99,6 +103,9 @@ impl RenderState {
         // Determine size of primitive buffer
         let prim_buffer_byte_size = (PRIM_BUFFER_LEN * std::mem::size_of::<Primitive>()) as u64;
 
+        // Determine size of globals buffer
+        let globals_buffer_byte_size = (std::mem::size_of::<Globals>()) as u64;
+
         // Create primitive buffer
         let prims_ubo = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Prims ubo"),
@@ -107,29 +114,55 @@ impl RenderState {
             mapped_at_creation: false,
         });
 
+        // Create globals buffer
+        let globals_ubo = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Globals ubo"),
+            size: globals_buffer_byte_size,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         // Create bind group layout for uniform buffers
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Bind group layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(prim_buffer_byte_size),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(prim_buffer_byte_size),
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(globals_buffer_byte_size),
+                    },
+                    count: None,
+                },
+            ],
         });
 
         // Create bind group
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Bind group"),
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(prims_ubo.as_entire_buffer_binding()),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(prims_ubo.as_entire_buffer_binding()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(globals_ubo.as_entire_buffer_binding()),
+                },
+            ],
         });
 
         let render_pipeline_layout =
@@ -179,6 +212,9 @@ impl RenderState {
             multiview: None,
         });
 
+        let zoom = 1.0;
+        let offset = [0.0; 2];
+
         Self {
             surface,
             device,
@@ -187,9 +223,12 @@ impl RenderState {
             render_pipeline,
             primitives,
             prims_ubo,
+            globals_ubo,
             bind_group,
             sample_count,
             size,
+            zoom,
+            offset,
         }
     }
 
@@ -304,6 +343,19 @@ impl RenderState {
                     label: Some("Render Encoder"),
                 });
 
+        // Update globals buffer
+        self.queue.write_buffer(
+            &self.globals_ubo,
+            0,
+            bytemuck::cast_slice(&[Globals {
+                resolution: [self.size.width as f32, self.size.height as f32],
+                zoom: self.zoom,
+                offset: self.offset,
+                _pad: 0,
+            }]),
+        );
+
+        // Update primitives uniform buffer
         self.queue
             .write_buffer(&self.prims_ubo, 0, bytemuck::cast_slice(&self.primitives));
 
