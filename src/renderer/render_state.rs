@@ -1,9 +1,8 @@
 extern crate lyon;
 
+use crate::animation::DOM;
 use crate::renderer::primitive::Primitive;
 use crate::renderer::vertex::Vertex;
-use crate::smoothie::DOM;
-use std::ops::Range;
 
 use crate::renderer::globals::Globals;
 use lyon::tessellation::VertexBuffers;

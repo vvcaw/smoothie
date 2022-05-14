@@ -1,50 +1,46 @@
-use crate::element::Element;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::thread;
 
-/// Custom type to represent the rendering **DOM**
-pub type DOM = HashMap<usize, Box<dyn Element + Send>>;
+use crate::animation::Scene;
+use crate::element::Element;
+use crate::renderer::Renderer;
 
-/// The **Smoothie** struct
 pub struct Smoothie {
-    /// The rendering **DOM**
-    dom: Arc<Mutex<DOM>>,
-    /// The copy of **dom** that is exposed to user
-    dom_copy: DOM,
-    /// Start time of animation
-    start_time: Instant,
+    /// List of **elements** in scene
+    elements: Vec<Box<dyn Element + Send>>,
+    /// HashMap mapping start times to keyframes
+    keyframes: HashMap<f32, String>,
+    /// Scene to update the data in
+    scene: Scene,
 }
 
 impl Smoothie {
-    /// Create new **Smoothie** instance
-    pub fn new(dom: Arc<Mutex<DOM>>) -> Self {
-        Self {
-            dom,
-            dom_copy: HashMap::new(),
-            start_time: Instant::now(),
+    /// Creates a new **Smoothie** instance
+    pub(crate) fn new() -> Self {
+        Smoothie {
+            elements: Vec::new(),
+            keyframes: HashMap::new(),
+            scene: Scene::new(),
         }
     }
 
-    /// Returns the time since the start of the animation
-    pub fn time_since_start(&self) -> Duration {
-        Instant::now() - self.start_time
-    }
+    /// Renders the current scene (either as live preview or as video file), the **Smoothie** object is lost after this function call, therefore, no other function calls are allowed after this one!
+    pub fn serve(self) {
+        // Create dom that is synced between threads
+        let dom = Arc::new(Mutex::new(HashMap::new()));
+        let renderer_dom = Arc::clone(&dom).clone();
 
-    /// Returns the reference to the **dom**
-    pub fn dom(&mut self) -> &mut DOM {
-        &mut self.dom_copy
-    }
+        // Get mutable reference of scene to pass to second thread
+        let mut scene = self.scene;
 
-    /// Commits the changes to the **dom** to the **renderer**
-    pub fn commit(&self) {
-        match self.dom.lock() {
-            Ok(mut dom) => {
-                *dom = self.dom_copy.clone();
-            }
-            Err(e) => {
-                eprintln!("{:?}", e);
-            }
-        }
+        // Create thread to execute user code
+        thread::spawn(move || scene.animate_script(dom));
+
+        // Renderer instance
+        let mut renderer = Renderer::new(renderer_dom);
+
+        // Run render loop
+        pollster::block_on(renderer.run());
     }
 }

@@ -4,7 +4,7 @@ mod render_state;
 mod vertex;
 mod with_id;
 
-use crate::DOM;
+use crate::animation::DOM;
 use render_state::RenderState;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
