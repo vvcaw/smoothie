@@ -44,3 +44,28 @@ impl Smoothie {
         pollster::block_on(renderer.run());
     }
 }
+
+// TODO: Current syntax rules allow for double semi-colon
+#[macro_export]
+macro_rules! animate {
+    ($($obj:expr,$prop:ident => $val:expr)+ $(;with $(duration = $dur:expr)? $(;easing = $ease:expr)? $(;)?)?) => {
+        $(
+        println!(
+            "The user wants to animate the property {:?} from {:?} to {:?} for element with id {:?}",
+            (stringify! {$prop}),
+            $obj.$prop,
+            $val,
+            $obj.id);
+        )+
+    };
+    ($($obj:expr,$prop:ident => $val:expr)+ $(;with $(easing = $ease:expr)? $(;duration = $dur:expr)? $(;)?)?) => {
+        $(
+        println!(
+            "The user wants to animate the property {:?} from {:?} to {:?} for element with id {:?}",
+            (stringify! {$prop}),
+            $obj.$prop,
+            $val,
+            $obj.id);
+        )+
+    };
+}
