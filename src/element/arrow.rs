@@ -1,5 +1,6 @@
 use crate::element::Element;
 use crate::renderer::{Vertex, WithId};
+use crate::{element, Easing, Keyframe};
 use lyon::lyon_tessellation::VertexBuffers;
 use lyon::math::point;
 use lyon::path::Path;
@@ -7,31 +8,40 @@ use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillRule, FillTessellator, LineCap, StrokeOptions,
     StrokeTessellator,
 };
+use std::borrow::{Borrow, BorrowMut};
 
 #[derive(Clone)]
 pub struct Arrow {
-    x: f64,
-    y: f64,
-    stroke: bool,
-    fill: bool,
-    scale: f32,
-    angle: f32,
+    pub x: f32,
+    pub y: f32,
+    pub stroke: bool,
+    pub fill: bool,
+    pub scale: f32,
+    pub angle: f32,
+    pub(crate) keyframes: Vec<Keyframe<Arrow>>,
+    pub(crate) id: usize,
 }
 
 impl Arrow {
-    pub fn new(scale: f32) -> Self {
-        Arrow {
-            x: 0.0,
-            y: 0.0,
-            stroke: false,
-            fill: true, // TODO: Since both stroke and fill vertices use the same buffer, the colors of the fill / stroke vertices are the same, to avoid this, maybe add a fill and a stroke color to the Primitive and the vertex shader stage, as this will be needed for any shape that is rendered
-            scale,
-            angle: 0.0,
-        }
+    /// Add keyframes to the given **Element**, this method is automatically invoked by the `animate!` macro!
+    pub fn add_keyframe(
+        &mut self,
+        keyframe_data: (fn(&mut Arrow, f32), f32, f32, f32, f32, Easing),
+    ) {
+        let (setter_fn, start_value, end_value, start_time, duration, easing) = keyframe_data;
+
+        self.keyframes.push(Keyframe {
+            setter_fn,
+            start_value,
+            end_value,
+            start_time,
+            duration,
+            easing,
+        });
     }
 }
 
-impl Element for Arrow {
+impl crate::element::private::Element for Arrow {
     fn render(&self, geometry: &mut VertexBuffers<Vertex, u16>, primitive_id: usize) {
         // Build a Path for the arrow
         let mut builder = Path::builder();
@@ -75,23 +85,30 @@ impl Element for Arrow {
         }
     }
 
-    fn get_scale(&self) -> f32 {
-        self.scale
+    fn box_clone(&self) -> Box<dyn crate::element::Element + Send> {
+        Box::new((*self).clone())
     }
 
-    fn set_scale(&mut self, scale: f32) {
-        self.scale = scale;
+    fn update_data_with_keyframes(&mut self, time_since_start: f32) {
+        // Evaluate which keyframes need to be updated and update them
+        self.keyframes
+            .clone()
+            .iter()
+            .filter(|keyframe| keyframe.is_active(time_since_start))
+            .for_each(|keyframe| keyframe.update_keyframe_data(self.borrow_mut(), time_since_start))
+    }
+
+    fn get_scale(&self) -> f32 {
+        self.scale
     }
 
     fn get_angle(&self) -> f32 {
         self.angle
     }
+}
 
-    fn set_angle(&mut self, angle: f32) {
-        self.angle = angle;
-    }
-
-    fn box_clone(&self) -> Box<dyn Element + Send> {
-        Box::new((*self).clone())
+impl Element for Arrow {
+    fn get_id(&self) -> usize {
+        self.id
     }
 }

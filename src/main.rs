@@ -1,29 +1,20 @@
-use smoothie::{animate, Arrow, Smoothie};
+use smoothie::animate;
 
 fn main() {
-    let smoothie = smoothie::shake();
+    let mut smoothie = smoothie::shake();
 
-    //let arrow = smoothie.arrow();
+    let mut arrow = smoothie.arrow();
 
-    #[derive(Debug)]
-    struct Test {
-        x: f32,
-        y: f32,
-        id: usize,
-    }
-
-    let arrow = Test {
-        x: 5.0,
-        y: 5.0,
-        id: 0,
+    animate! {
+        smoothie;
+        arrow,x => 2.5; // x and y are not yet updated in render_state
+        arrow,y => 2.5;
+        arrow,scale => 0.5;
     };
 
     animate! {
-        arrow,x => 10.0
-        arrow,y => 9.0;
-        with
-        duration = 4.0;
-        easing = "Linear"
+        smoothie;
+        arrow,scale => 0.8;
     }
 
     smoothie.serve();
