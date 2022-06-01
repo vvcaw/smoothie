@@ -9,6 +9,7 @@ use lyon::tessellation::{
     StrokeTessellator,
 };
 use std::borrow::{Borrow, BorrowMut};
+use std::mem;
 
 #[derive(Clone)]
 pub struct Arrow {
@@ -91,11 +92,16 @@ impl crate::element::private::Element for Arrow {
 
     fn update_data_with_keyframes(&mut self, time_since_start: f32) {
         // Evaluate which keyframes need to be updated and update them
-        self.keyframes
-            .clone()
+        let keyframes = mem::take(&mut self.keyframes);
+
+        keyframes
             .iter()
             .filter(|keyframe| keyframe.is_active(time_since_start))
-            .for_each(|keyframe| keyframe.update_keyframe_data(self.borrow_mut(), time_since_start))
+            .for_each(|keyframe| {
+                keyframe.update_keyframe_data(self.borrow_mut(), time_since_start)
+            });
+
+        self.keyframes = keyframes;
     }
 
     fn get_scale(&self) -> f32 {
