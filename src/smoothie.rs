@@ -95,12 +95,14 @@ impl Smoothie {
 /// # Examples
 ///
 /// ```
-/// use smoothie::{animate};
+/// use smoothie::{animate, Easing};
 /// let mut smoothie = smoothie::shake();
 /// let mut arrow = smoothie.arrow();
 ///
 /// animate! {
 ///     smoothie;
+///     duration = 2.0; // This can be left out, default is 1.0
+///     easing = Easing::Linear; // This can be left out, default is Easing::EaseInOUt
 ///     arrow,x => 14.0;
 ///     arrow,y => 12.0;
 /// };
@@ -132,42 +134,90 @@ macro_rules! animate {
     }};
     // Pattern with duration & without easing
     ($smoothie:expr; duration = $duration:expr; $($object:expr,$property:ident => $value:expr);* $(;)?) => {{
-        let mut keyframes = Vec::new();
-
         $(
-            keyframes.push(($object.id, String::from(stringify!($property)), $object.$property, $value, $duration, smoothie::Easing::EaseInOut));
+            // Generate correct setter function based on element type
+            let setter_fn = match $object {
+                smoothie::Arrow { .. } => |object: &mut smoothie::Arrow, progress: f32| {
+                    object.$property = progress;
+                }
+            };
+
+            // Add keyframes to element
+            $object.add_keyframe((setter_fn, $object.$property, $value, $smoothie.get_current_animation_time(), $duration, smoothie::Easing::EaseInOut));
+
+            // Add elements to track list
+            $smoothie.add_element(&$object);
+
+            // Update value in live element
+            $object.$property = $value;
         )*
 
-        $smoothie.add_keyframes(keyframes, $duration);
+        $smoothie.increment_animation_time($duration);
     }};
     // Pattern with easing & without duration
     ($smoothie:expr; easing = $easing:expr; $($object:expr,$property:ident => $value:expr);* $(;)?) => {{
-        let mut keyframes = Vec::new();
-
         $(
-            keyframes.push(($object.id, String::from(stringify!($property)), $object.$property, $value, 1.0, $easing));
+            // Generate correct setter function based on element type
+            let setter_fn = match $object {
+                smoothie::Arrow { .. } => |object: &mut smoothie::Arrow, progress: f32| {
+                    object.$property = progress;
+                }
+            };
+
+            // Add keyframes to element
+            $object.add_keyframe((setter_fn, $object.$property, $value, $smoothie.get_current_animation_time(), 1.0, $easing));
+
+            // Add elements to track list
+            $smoothie.add_element(&$object);
+
+            // Update value in live element
+            $object.$property = $value;
         )*
 
-        $smoothie.add_keyframes(keyframes, 1.0);
+        $smoothie.increment_animation_time(1.0);
     }};
     // Pattern with easing & duration
     ($smoothie:expr; easing = $easing:expr; duration = $duration:expr; $($object:expr,$property:ident => $value:expr);* $(;)?) => {{
-        let mut keyframes = Vec::new();
-
         $(
-            keyframes.push(($object.id, String::from(stringify!($property)), $object.$property, $value, $duration, $easing));
+            // Generate correct setter function based on element type
+            let setter_fn = match $object {
+                smoothie::Arrow { .. } => |object: &mut smoothie::Arrow, progress: f32| {
+                    object.$property = progress;
+                }
+            };
+
+            // Add keyframes to element
+            $object.add_keyframe((setter_fn, $object.$property, $value, $smoothie.get_current_animation_time(), $duration, $easing));
+
+            // Add elements to track list
+            $smoothie.add_element(&$object);
+
+            // Update value in live element
+            $object.$property = $value;
         )*
 
-        $smoothie.add_keyframes(keyframes, $duration);
+        $smoothie.increment_animation_time($duration);
     }};
     // Pattern with easing & duration in other direction
     ($smoothie:expr; duration = $duration:expr; easing = $easing:expr; $($object:expr,$property:ident => $value:expr);* $(;)?) => {{
-        let mut keyframes = Vec::new();
-
         $(
-            keyframes.push(($object.id, String::from(stringify!($property)), $object.$property, $value, $duration, $easing));
+            // Generate correct setter function based on element type
+            let setter_fn = match $object {
+                smoothie::Arrow { .. } => |object: &mut smoothie::Arrow, progress: f32| {
+                    object.$property = progress;
+                }
+            };
+
+            // Add keyframes to element
+            $object.add_keyframe((setter_fn, $object.$property, $value, $smoothie.get_current_animation_time(), $duration, $easing));
+
+            // Add elements to track list
+            $smoothie.add_element(&$object);
+
+            // Update value in live element
+            $object.$property = $value;
         )*
 
-        $smoothie.add_keyframes(keyframes, $duration);
+        $smoothie.increment_animation_time($duration);
     }};
 }
